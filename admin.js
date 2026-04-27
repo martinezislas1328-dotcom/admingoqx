@@ -869,30 +869,75 @@ function cargarColoresPapelAdmin() {
     });
 }
 
-// Función del botón "Añadir Papel"
+// ==========================================
+// SISTEMA DE COLORES - PANEL ADMIN
+// ==========================================
+
+// 1. Función para guardar un nuevo color
 window.guardarColorPapel = function() {
     const nombre = document.getElementById('nombrePapelNuevo').value;
     const hex = document.getElementById('hexPapelNuevo').value;
-    
-    if(!nombre.trim()) { 
-        alert("Escribe el nombre del color, güey."); 
-        return; 
+
+    if(nombre.trim() === '') {
+        alert('Por favor ponle un nombre al color.');
+        return;
     }
+
+    const idColor = 'color_' + Date.now();
     
-    db.ref('Configuracion/Papeles').push({
+    // Guardamos en Firebase
+    db.ref('Configuracion/Papeles/' + idColor).set({
+        id: idColor,
         nombre: nombre,
         hex: hex
     }).then(() => {
+        alert('¡Color añadido con éxito!');
         document.getElementById('nombrePapelNuevo').value = '';
+        // No necesitamos recargar manualmente porque la función de abajo detecta el cambio
+    }).catch(error => {
+        console.error("Error al guardar: ", error);
+        alert("Hubo un error al guardar. Checa la consola.");
     });
 };
 
-// Función del botón "Borrar"
-window.eliminarColorPapel = function(id) {
-    if(confirm("¿Seguro que quieres borrar este color de papel?")) {
-        db.ref('Configuracion/Papeles/' + id).remove();
+// 2. Función para cargar los colores en la lista del admin
+window.cargarColoresPapelAdmin = function() {
+    // Usamos .on() en lugar de .once() para que se actualice en tiempo real si agregas o borras
+    db.ref('Configuracion/Papeles').on('value', snap => {
+        const lista = document.getElementById('listaColoresAdmin');
+        if(!lista) return;
+
+        lista.innerHTML = '';
+        if(snap.exists()) {
+            snap.forEach(child => {
+                const color = child.val();
+                lista.innerHTML += `
+                    <li style="display: flex; align-items: center; margin-bottom: 10px; padding: 5px; background: #f9f9f9; border-radius: 5px;">
+                        <div style="width: 25px; height: 25px; background: ${color.hex}; border-radius: 50%; border: 1px solid #ccc; margin-right: 10px;"></div>
+                        <span style="flex-grow: 1; font-weight: bold;">${color.nombre}</span>
+                        <button onclick="eliminarColorPapel('${color.id}')" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Borrar</button>
+                    </li>
+                `;
+            });
+        } else {
+            lista.innerHTML = '<li style="color: #666; font-style: italic;">No hay colores guardados aún.</li>';
+        }
+    });
+};
+
+// 3. Función para borrar un color
+window.eliminarColorPapel = function(idColor) {
+    if(confirm('¿Seguro que quieres borrar este color?')) {
+        db.ref('Configuracion/Papeles/' + idColor).remove()
+        .then(() => {
+            console.log("Color eliminado");
+        }).catch(error => {
+            alert("Error al borrar: " + error);
+        });
     }
 };
 
+// 4. Esta línea es clave: Hace que la lista cargue en cuanto abres la página
+cargarColoresPapelAdmin();
 // Ejecutamos la carga al iniciar el admin
 cargarColoresPapelAdmin();
